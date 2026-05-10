@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "arkdata"
+version = "2.0.0"
+description = "Arknights game data"
+license = "AGPL-3.0-or-later"
+authors = ["astral4 <88992929+astral4@users.noreply.github.com>"]
+readme = "README.md"
+homepage = "https://github.com/astral4/arkdata"
+repository = "https://github.com/astral4/arkdata"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydub = "^0.25.0"
+toml = "^0.10.2"
+requests = "^2.31.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

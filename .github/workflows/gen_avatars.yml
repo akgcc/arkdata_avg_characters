@@ -1,0 +1,71 @@
+name: Generate avatar images on data update
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'assets/**'
+      - 'cropper_data/manual_coords.json'
+    branches:
+      - main
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: push
+      cancel-in-progress: false
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: true
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          
+      - name: Cache Python Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-manual-v2
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install libGL
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+
+      - name: Create constraints file
+        run: echo "numpy<2" > constraints.txt
+        
+      - name: Install dependencies with constraints
+        run: |
+          pip install torch==1.12.1 torchvision==0.13.1 imagesize==1.4.1 openmim==0.3.2 wheel
+          python -m mim install mmcv-full==1.6.2
+          python -m mim install mmdet==2.25.2
+          pip install --no-build-isolation mmpose==0.28.1
+          pip install anime-face-detector==0.0.9 --constraint constraints.txt
+          pip freeze
+          
+      - name: Clone ArknightsGameData
+        run: |
+          git clone https://github.com/ArknightsAssets/ArknightsGamedata.git ./ArknightsGameData
+          
+      - name: Run Python Script
+        run: python crop_avatars.py
+        
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions
+          message: 'update avatars'
+          add: '["*.json", "thumbs"]'
