@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 use tap::Pipe;
-use tokio::task::{spawn_blocking, JoinHandle, JoinSet};
+use tokio::task::{spawn_blocking, JoinHandle};
 use zip::ZipArchive;
 
 fn is_in_whitelist(test: &str) -> bool {
@@ -83,22 +83,46 @@ impl UpdateInfo {
     }
 }
 
+// async fn process_parallel<I, F>(tasks: I)
+// where
+    // I: Iterator<Item = F>,
+    // F: Future<Output = Result<JoinHandle<()>>> + Send + 'static,
+// {
+    // let mut set = JoinSet::new();
+
+    // for task in tasks {
+        // set.spawn(task);
+    // }
+
+    // while let Some(res) = set.join_next().await {
+        // res.unwrap().unwrap().await.unwrap();
+    // }
+// }
 async fn process_parallel<I, F>(tasks: I)
 where
     I: Iterator<Item = F>,
     F: Future<Output = Result<JoinHandle<()>>> + Send + 'static,
 {
-    let mut set = JoinSet::new();
+    use tokio::sync::Semaphore;
+    use std::sync::Arc;
+
+    let sem = Arc::new(Semaphore::new(8)); // 👈 concurrency limit
+
+    let mut set = tokio::task::JoinSet::new();
 
     for task in tasks {
-        set.spawn(task);
+        let sem = sem.clone();
+
+        set.spawn(async move {
+            let _permit = sem.acquire().await.unwrap(); // holds slot
+            task.await
+        });
     }
 
     while let Some(res) = set.join_next().await {
         res.unwrap().unwrap().await.unwrap();
     }
 }
-
 async fn download_asset(name: Arc<str>, client: Client) -> Result<JoinHandle<()>> {
     let url = format!(
         "{}/assets/{}/{}.dat",
@@ -111,20 +135,23 @@ async fn download_asset(name: Arc<str>, client: Client) -> Result<JoinHandle<()>
             .replace(".usm", "")
     );
 
-    let response = RETRY_POLICY
-        .retry(|| async { client.get(&url).send().await?.error_for_status() })
-        .await?
-        .bytes()
-        .await?;
-
+    // let response = RETRY_POLICY
+        // .retry(|| async { client.get(&url).send().await?.error_for_status() })
+        // .await?
+        // .bytes()
+        // .await?;
+	let response = RETRY_POLICY
+		.retry(|| async {
+			let resp = client.get(&url).send().await?.error_for_status()?;
+			resp.bytes().await
+		})
+		.await?;
     let handle = spawn_blocking(move || {
         let mut archive = ZipArchive::new(Cursor::new(response))
-            .unwrap_or_else(|_| panic!("Failed to create zip archive from response at {name}"));
+            .expect("Failed to create zip archive from response at {name}");
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).unwrap_or_else(|_| {
-                panic!("Failed to read zip file at index {i} in archive at {name}")
-            });
+            let mut file = archive.by_index(i).expect("Failed to read zip file at index {i} in archive at {name}");
 
             let mut buffer = Vec::with_capacity(
                 file.size()
@@ -132,7 +159,8 @@ async fn download_asset(name: Arc<str>, client: Client) -> Result<JoinHandle<()>
                     .expect("File size as u64 could not be truncated to usize"),
             );
 
-            file.read_to_end(&mut buffer).unwrap();
+            // file.read_to_end(&mut buffer).unwrap();
+			file.read_to_end(&mut buffer).expect("failed reading zip entry");
 
             Python::with_gil(|py| {
                 let extract = py.import("kawapack").unwrap().getattr("extract").unwrap();
