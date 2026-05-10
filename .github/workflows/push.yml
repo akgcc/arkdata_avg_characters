@@ -16,8 +16,8 @@ jobs:
     steps:
       - name: export needed files
         run: |
-            curl https://raw.githubusercontent.com/akgcc/arkdata/main/cmp_version.py > cmp_version.py
-            curl https://raw.githubusercontent.com/akgcc/arkdata/main/cache/versions.json > versions.json
+            curl https://raw.githubusercontent.com/akgcc/arkdata_avg_characters/main/cmp_version.py > cmp_version.py
+            curl https://raw.githubusercontent.com/akgcc/arkdata_avg_characters/main/cache/versions.json > versions.json
       - id: early
         name: Early exit
         run: |
@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Check for lock file
         run: |
-          url='https://raw.githubusercontent.com/akgcc/arkdata/main/.github/LOCK_FAIL'
+          url='https://raw.githubusercontent.com/akgcc/arkdata_avg_characters/main/.github/LOCK_FAIL'
           if curl -sfILo/dev/null "$url"; then
             echo "Previous run failed, skipping this run."
             exit 1
