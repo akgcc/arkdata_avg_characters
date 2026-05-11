@@ -92,7 +92,15 @@ jobs:
 
       - name: Build app
         run: cargo build --release
-
+        
+      - name: Monitor RAM
+        run: |
+          while true; do
+            echo "==== MEMORY ===="
+            free -h
+            sleep 20
+          done &
+          
       - name: Run app
         env:
           PYTHONUNBUFFERED: 1  # Ensure Python output is flushed
