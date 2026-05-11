@@ -106,7 +106,7 @@ where
     use tokio::sync::Semaphore;
     use std::sync::Arc;
 
-    let sem = Arc::new(Semaphore::new(8)); // 👈 concurrency limit
+    let sem = Arc::new(Semaphore::new(1)); // 👈 concurrency limit
 
     let mut set = tokio::task::JoinSet::new();
 
