@@ -189,7 +189,7 @@ pub async fn fetch_all(
     hashes: &mut NameHashMapping,
     asset_info: &UpdateInfo,
     client: &Client,
-) {
+) -> anyhow::Result<()> {
     if hashes.inner.is_empty() && CONFIG.path_whitelist.is_none() {
         for pack in &asset_info.pack_infos {
             download_asset(pack.name.clone(), client.clone()).await?;
@@ -201,8 +201,9 @@ pub async fn fetch_all(
             download_asset(entry.name.clone(), client.clone()).await?;
 
             hashes.inner.insert(entry.name.clone(), entry.md5.clone());
-            hashes.save(&CONFIG.hashes_path)?;
         }
+
+        hashes.save(&CONFIG.hashes_path);
     } else {
         for entry in asset_info.ab_infos.iter().filter(|entry| {
             is_in_whitelist(&entry.name)
@@ -212,8 +213,9 @@ pub async fn fetch_all(
             download_asset(entry.name.clone(), client.clone()).await?;
 
             hashes.inner.insert(entry.name.clone(), entry.md5.clone());
-            hashes.save(&CONFIG.hashes_path)?;
         }
+
+        hashes.save(&CONFIG.hashes_path);
     }
 
     Ok(())
