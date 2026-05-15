@@ -38,7 +38,7 @@ async fn main() {
         create_dir_all(&CONFIG.output_dir).expect("Failed to create output directory");
     }
 
-    fetch_all(&name_to_hash_mapping, &asset_info, &client).await;
+    fetch_all(&mut name_to_hash_mapping, &asset_info, &client).await;
 
     if CONFIG.update_cache {
         let mut version = version;
