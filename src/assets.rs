@@ -192,36 +192,29 @@ pub async fn fetch_all(
 ) {
     if hashes.inner.is_empty() && CONFIG.path_whitelist.is_none() {
         for pack in &asset_info.pack_infos {
-            let _ = download_asset(pack.name.clone(), client.clone()).await;
+            download_asset(pack.name.clone(), client.clone()).await?;
         }
 
-        for entry in &asset_info.ab_infos {
-            if entry.pack_id.is_none() && is_in_whitelist(&entry.name) {
-                match download_asset(entry.name.clone(), client.clone()).await {
-                    Ok(_) => {
-                        hashes.inner.insert(entry.name.clone(), entry.md5.clone());
-                        let _ = hashes.save(&CONFIG.hashes_path);
-                    }
-                    Err(_) => {}
-                }
-            }
+        for entry in asset_info.ab_infos.iter().filter(|e| {
+            e.pack_id.is_none() && is_in_whitelist(&e.name)
+        }) {
+            download_asset(entry.name.clone(), client.clone()).await?;
+
+            hashes.inner.insert(entry.name.clone(), entry.md5.clone());
+            hashes.save(&CONFIG.hashes_path)?;
         }
     } else {
-        for entry in &asset_info.ab_infos {
-            if is_in_whitelist(&entry.name)
-                && hashes
-                    .inner
-                    .get(&entry.name)
+        for entry in asset_info.ab_infos.iter().filter(|entry| {
+            is_in_whitelist(&entry.name)
+                && hashes.inner.get(&entry.name)
                     .map_or(true, |hash| hash != &entry.md5)
-            {
-                match download_asset(entry.name.clone(), client.clone()).await {
-                    Ok(_) => {
-                        hashes.inner.insert(entry.name.clone(), entry.md5.clone());
-                        let _ = hashes.save(&CONFIG.hashes_path);
-                    }
-                    Err(_) => {}
-                }
-            }
+        }) {
+            download_asset(entry.name.clone(), client.clone()).await?;
+
+            hashes.inner.insert(entry.name.clone(), entry.md5.clone());
+            hashes.save(&CONFIG.hashes_path)?;
         }
     }
+
+    Ok(())
 }

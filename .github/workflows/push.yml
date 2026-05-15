@@ -91,16 +91,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build app
+        id: main
+        continue-on-error: true
         run: cargo build --release
         
-      - name: Monitor RAM
-        run: |
-          while true; do
-            echo "==== MEMORY ===="
-            free -h
-            sleep 20
-          done &
-          
       - name: Run app
         env:
           PYTHONUNBUFFERED: 1  # Ensure Python output is flushed
@@ -124,3 +118,10 @@ jobs:
           echo "Task failed" > .github/LOCK_FAIL
           git add .github/LOCK_FAIL
           git diff-index --quiet HEAD || git commit -m "Update failed, create lock file" && git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+      
+      - name: Fail job if flaky step failed
+      # should probably be merged with the above fail state somehow
+        if: steps.main.outcome == 'failure'
+        run: |
+          echo "Main program failed"
+          exit 111
