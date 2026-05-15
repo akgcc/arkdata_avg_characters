@@ -185,39 +185,43 @@ async fn download_asset(name: Arc<str>, client: Client) -> Result<JoinHandle<()>
     Ok(handle)
 }
 
-pub async fn fetch_all(hashes: &NameHashMapping, asset_info: &UpdateInfo, client: &Client) {
+pub async fn fetch_all(
+    hashes: &mut NameHashMapping,
+    asset_info: &UpdateInfo,
+    client: &Client,
+) {
     if hashes.inner.is_empty() && CONFIG.path_whitelist.is_none() {
-        // No assets have been downloaded before
-        // Download asset packs
-        asset_info
-            .pack_infos
-            .iter()
-            .map(|pack| download_asset(pack.name.clone(), client.clone()))
-            .pipe(process_parallel)
-            .await;
+        for pack in &asset_info.pack_infos {
+            let _ = download_asset(pack.name.clone(), client.clone()).await;
+        }
 
-        // Some assets do not have a pack ID, so they need to be fetched separately
-        asset_info
-            .ab_infos
-            .iter()
-            .filter(|entry| entry.pack_id.is_none() && is_in_whitelist(&entry.name))
-            .map(|entry| download_asset(entry.name.clone(), client.clone()))
-            .pipe(process_parallel)
-            .await;
+        for entry in &asset_info.ab_infos {
+            if entry.pack_id.is_none() && is_in_whitelist(&entry.name) {
+                match download_asset(entry.name.clone(), client.clone()).await {
+                    Ok(_) => {
+                        hashes.inner.insert(entry.name.clone(), entry.md5.clone());
+                        let _ = hashes.save(&CONFIG.hashes_path);
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
     } else {
-        // Update collection of existing assets
-        asset_info
-            .ab_infos
-            .iter()
-            .filter(|entry| {
-                is_in_whitelist(&entry.name)
-                    && hashes
-                        .inner
-                        .get(&entry.name)
-                        .map_or(true, |hash| hash != &entry.md5)
-            })
-            .map(|entry| download_asset(entry.name.clone(), client.clone()))
-            .pipe(process_parallel)
-            .await;
+        for entry in &asset_info.ab_infos {
+            if is_in_whitelist(&entry.name)
+                && hashes
+                    .inner
+                    .get(&entry.name)
+                    .map_or(true, |hash| hash != &entry.md5)
+            {
+                match download_asset(entry.name.clone(), client.clone()).await {
+                    Ok(_) => {
+                        hashes.inner.insert(entry.name.clone(), entry.md5.clone());
+                        let _ = hashes.save(&CONFIG.hashes_path);
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
     }
 }
