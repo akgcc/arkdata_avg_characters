@@ -205,15 +205,17 @@ pub async fn fetch_all(
 
         hashes.save(&CONFIG.hashes_path);
     } else {
-        for entry in asset_info.ab_infos.iter().filter(|entry| {
-            is_in_whitelist(&entry.name)
-                && hashes.inner.get(&entry.name)
-                    .map_or(true, |hash| hash != &entry.md5)
-        }) {
-            download_asset(entry.name.clone(), client.clone()).await?;
+        for entry in &asset_info.ab_infos {
+			if !is_in_whitelist(&entry.name)
+				|| hashes.inner.get(&entry.name)
+					.map_or(true, |hash| hash != &entry.md5)
+			{
+				continue;
+			}
 
-            hashes.inner.insert(entry.name.clone(), entry.md5.clone());
-        }
+			download_asset(entry.name.clone(), client.clone()).await?;
+			hashes.inner.insert(entry.name.clone(), entry.md5.clone());
+		}
 
         hashes.save(&CONFIG.hashes_path);
     }
